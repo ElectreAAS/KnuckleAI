@@ -1,1 +1,5 @@
-let () = print_endline "Hello world!"
+open Model
+
+let () =
+  let t = init () in
+  display t
