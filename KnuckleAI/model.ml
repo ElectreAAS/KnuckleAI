@@ -1,8 +1,10 @@
 type column = { contents : int list; score : int }
-type board = { left : column; middle : column; right : column }
-type player = Ratau | Lamb
-type t = { ratau : board; lamb : board; up_next : player; next_dice : int }
 type choice = Left | Middle | Right
+type player = Ratau | Lamb
+
+type board = { left : column; middle : column; right : column }
+and ai = t -> int -> choice
+and t = { ratau : board; lamb : board; up_next : player; next_dice : int }
 
 let player_of_string = function
   | "ratau" | "Ratau" -> Ratau
