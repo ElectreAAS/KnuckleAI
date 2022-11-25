@@ -17,8 +17,14 @@ let rec game_loop t print =
   if not @@ is_valid t choice then (
     Printf.printf "This move is invalid, try again\n";
     game_loop t false)
-  else game_loop (play t choice) true
+  else
+    let new_t, finished = play t choice in
+    if finished then (
+      display new_t;
+      Printf.printf "Game finished!\n")
+    else game_loop new_t true
 
 let () =
+  Random.self_init ();
   let t = init () in
-  try game_loop t true with Exit -> Printf.printf "Game finished! Well done!"
+  game_loop t true

@@ -1,40 +1,39 @@
 type column = { contents : int list; score : int }
 type board = { left : column; middle : column; right : column }
 type player = Ratau | Lamb
-type t = { ratau : board; lamb : board; up_next : player }
-type choice = Left of int | Middle of int | Right of int
+type t = { ratau : board; lamb : board; up_next : player; next_dice : int }
+type choice = Left | Middle | Right
 
 let player_of_string = function
   | "ratau" | "Ratau" -> Ratau
   | "lamb" | "Lamb" -> Lamb
-  | _ ->
-      Random.self_init ();
-      if Random.bool () then Ratau else Lamb
+  | _ -> if Random.bool () then Ratau else Lamb
+
+let dice_throw () = Random.int 6 + 1
 
 let init ?(up_next = "") () =
   let col = { contents = []; score = 0 } in
   let b = { left = col; middle = col; right = col } in
-  { ratau = b; lamb = b; up_next = player_of_string up_next }
+  {
+    ratau = b;
+    lamb = b;
+    up_next = player_of_string up_next;
+    next_dice = dice_throw ();
+  }
 
 let pos_of_choice b = function
-  | Left _ -> b.left
-  | Middle _ -> b.middle
-  | Right _ -> b.right
+  | Left -> b.left
+  | Middle -> b.middle
+  | Right -> b.right
 
 let pos_of_player t = function Ratau -> t.ratau | Lamb -> t.lamb
 
 let choice_of_string s =
-  match String.split_on_char ' ' s with
-  | ("left" | "Left") :: [ x ] ->
-      let n = int_of_string x in
-      Left n
-  | ("middle" | "Middle") :: [ x ] ->
-      let n = int_of_string x in
-      Middle n
-  | ("right" | "Right") :: [ x ] ->
-      let n = int_of_string x in
-      Right n
-  | _ -> failwith "int_of_string"
+  match s with
+  | "l" | "left" | "Left" -> Left
+  | "m" | "middle" | "Middle" -> Middle
+  | "r" | "right" | "Right" -> Right
+  | _ -> failwith "choice_of_string"
 
 let arr_of_board b =
   let arr = Array.init 3 (fun _ -> Array.make 4 0) in
@@ -55,16 +54,16 @@ let score_of_col = function
   | [ x; y; z ] when y = z -> (y * 4) + x
   | col -> List.fold_left ( + ) 0 col
 
-let play_self b = function
-  | Left n ->
+let play_self b n = function
+  | Left ->
       let contents = n :: b.left.contents in
       let score = score_of_col contents in
       { b with left = { contents; score } }
-  | Middle n ->
+  | Middle ->
       let contents = n :: b.middle.contents in
       let score = score_of_col contents in
       { b with middle = { contents; score } }
-  | Right n ->
+  | Right ->
       let contents = n :: b.right.contents in
       let score = score_of_col contents in
       { b with right = { contents; score } }
@@ -74,14 +73,14 @@ let oppo_played n col =
   let score = score_of_col contents in
   { contents; score }
 
-let play_oppo b = function
-  | Left n ->
+let play_oppo b n = function
+  | Left ->
       let left = oppo_played n b.left in
       { b with left }
-  | Middle n ->
+  | Middle ->
       let middle = oppo_played n b.middle in
       { b with middle }
-  | Right n ->
+  | Right ->
       let right = oppo_played n b.right in
       { b with right }
 
@@ -102,12 +101,15 @@ let is_finished t =
 let play t ch =
   let ratau, lamb, up_next =
     match t.up_next with
-    | Ratau -> (play_self t.ratau ch, play_oppo t.lamb ch, Lamb)
-    | Lamb -> (play_oppo t.ratau ch, play_self t.lamb ch, Ratau)
+    | Ratau ->
+        (play_self t.ratau t.next_dice ch, play_oppo t.lamb t.next_dice ch, Lamb)
+    | Lamb ->
+        ( play_oppo t.ratau t.next_dice ch,
+          play_self t.lamb t.next_dice ch,
+          Ratau )
   in
-  let new_t = { ratau; lamb; up_next } in
-  if is_finished t then raise Exit;
-  new_t
+  let new_t = { ratau; lamb; up_next; next_dice = dice_throw () } in
+  (new_t, is_finished new_t)
 
 let scores t =
   let score_of_board b = b.left.score + b.middle.score + b.right.score in
@@ -116,8 +118,8 @@ let scores t =
 let display t =
   let rarr, larr = (arr_of_board t.ratau, arr_of_board t.lamb) in
   let rscore, lscore = scores t in
+  let over = is_finished t in
   let remoji, lemoji =
-    let over = is_finished t in
     match compare rscore lscore with
     | 0 -> if over then ("TIE 🙃", "TIE 🙃") else ("😐", "😐")
     | 1 -> if over then ("WINNER 😎", "LOSER  😞") else ("😃", "😟")
@@ -158,9 +160,9 @@ let display t =
           rarr.(0).(3)
           rarr.(1).(3)
           rarr.(2).(3);
-        Printf.printf "\n    Ratau:%3d %s\n" rscore remoji
+        Printf.printf "    Ratau:%3d %s\n" rscore remoji
     | Lamb ->
-        Printf.printf "\n     Lamb:%3d %s\n" lscore lemoji;
+        Printf.printf "     Lamb:%3d %s\n" lscore lemoji;
         Printf.printf "╔═ %2d ══╤═ %2d ══╤═ %2d ══╗\n"
           larr.(0).(3)
           larr.(1).(3)
@@ -169,6 +171,8 @@ let display t =
         print_string "╚═══════╧═══════╧═══════╝\n"
   in
   print_grid Ratau;
-  print_string "\n 🎲🎲🎲🎲🎲🎲🎲🎲🎲🎲🎲🎲\n";
+  (if not over then
+   let next_emoji = match t.up_next with Ratau -> "⬆️" | Lamb -> "⬇️" in
+   Printf.printf "\nYour turn, %s  You rolled %d\n\n" next_emoji t.next_dice);
   print_grid Lamb;
   flush stdout
