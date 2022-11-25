@@ -21,10 +21,8 @@ let rec game_loop t print decision =
       Printf.printf "Game finished!\n")
     else game_loop new_t true decision
 
-let default_ai _ = choice_of_string [| "l"; "m"; "r" |].(Random.int 3)
-
 let () =
   Random.self_init ();
   let t = init () in
   game_loop t true (fun t ->
-      match t.up_next with Lamb -> read_choice () | Ratau -> default_ai t)
+      match t.up_next with Lamb -> read_choice () | Ratau -> RandomAI.go t)
